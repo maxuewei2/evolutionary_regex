@@ -10,6 +10,8 @@ import csv
 import logging
 import os
 import json
+import sys
+
 """
 用 python 3 运行
 缺少numpy库:
@@ -42,8 +44,7 @@ class EvolutionRe:
         valid_patterns: 满足要求的正则表达式
     """
 
-    def __init__(self, population_num=200, dim=20, max_gen=1000, crossover_rate=0.2, mutate_rate=0.1,
-                 div=1, dtype=np.uint16):
+    def __init__(self, population_num=200, dim=20, max_gen=1000, crossover_rate=0.2, mutate_rate=0.1, div=1, dtype=np.uint16):
         """
         :param population_num: 种群大小
         :param dim: 正则表达式最大长度
@@ -55,6 +56,7 @@ class EvolutionRe:
         """
         self.strings = []  # 待测试字符串列表
         self.pattern_elements = []  # 组成正则表达式的元素列表
+        self.pattern_elements_len = 0  # 组成正则表达式的元素列表长度
         self.labels = []  # 字符串label列表，要匹配的字符串为1
         self.population_num = population_num  # 种群大小
         self.dim = dim  # 正则表达式的长度(以element计)
@@ -66,7 +68,6 @@ class EvolutionRe:
         self.dt_max = np.iinfo(self.dt).max  # 编码单元的最大值
         self.dt_min = np.iinfo(self.dt).min  # 编码单元的最小值
         self.max_str_len = 0
-        self.code_dict = {}  # 编码—>字符的映射字典
         self.pattern_dict = {}  # 记录已计算过适应度的pattern的字典，pattern->适应度的映射
         self.valid_patterns = {}  # 存储可用的正则表达式,pattern->ls的映射，ls为匹配的string的下标构成的列表
         self.eps = 1e-10
@@ -79,7 +80,7 @@ class EvolutionRe:
         :param code_list:
         :return: 解码所得的pattern字符串
         """
-        st = "".join([self.code_dict[x] for x in code_list])
+        st = "".join([self.pattern_elements[x % self.pattern_elements_len] for x in code_list])
         st, n = self.re_reduce.subn(r'.*', st)
         return st
 
@@ -123,7 +124,8 @@ class EvolutionRe:
         """
         pattern_str = self.decode(pattern_code)
         eva_score = self.evaluate_str(pattern_str)
-        self.pattern_dict[pattern_str] = eva_score  # 将该pattern_str添加进pattern_dict
+        # 将该pattern_str添加进pattern_dict
+        self.pattern_dict[pattern_str] = eva_score
         return eva_score
 
     def evaluate_one(self, pattern_code):
@@ -133,7 +135,8 @@ class EvolutionRe:
         :return: 适应度，浮点型
         """
         pattern_str = self.decode(pattern_code)
-        if pattern_str == '.*' * int(len(pattern_str) / 2):  # 如果该pattern全由.*构成，则返回-1
+        # 如果该pattern全由.*构成，则返回-1
+        if pattern_str == '.*' * int(len(pattern_str) / 2):
             return -1, len(pattern_str)
         if pattern_str in self.pattern_dict:
             return self.pattern_dict[pattern_str], len(pattern_str)
@@ -171,7 +174,8 @@ class EvolutionRe:
                 es_sort_by_e.append([])
             es_sort_by_e[-1].append(e)
         for i in range(len(es_sort_by_e)):
-            es_sort_by_e[i] = sorted(es_sort_by_e[i], key=lambda a: a[2], reverse=True)  # 适应度相同的按pattern长度从大到小排序
+            # 适应度相同的按pattern长度从大到小排序
+            es_sort_by_e[i] = sorted(es_sort_by_e[i], key=lambda a: a[2], reverse=True)
         for i in range(len(es_sort_by_e) - 1):
             diff = es_sort_by_e[i + 1][0][1] - es_sort_by_e[i][0][1]
             diff /= len(es_sort_by_e[i])
@@ -239,14 +243,14 @@ class EvolutionRe:
         """
         r = np.random.randint(0, p.shape[0], int(p.shape[0] * self.mutate_rate))  # 随机生成要变异的个体下标
         rr = np.random.randint(0, self.dim, int(p.shape[0] * self.mutate_rate))  # 随机生成要变异的编码元素位置
-        rrr = np.random.randint(0, self.dt.itemsize * 8, int(p.shape[0] * self.mutate_rate))  # 随机生成在以上编码元素上要变异的二进制位置
-        mutate_ones=[]
+        # 随机生成在以上编码元素上要变异的二进制位置
+        rrr = np.random.randint(0, self.dt.itemsize * 8, int(p.shape[0] * self.mutate_rate))
+        mutate_ones = []
         for i in range(len(r)):
-            mutate_one=copy.deepcopy(p[r[i]][rr[i]])
-            mutate_one += (2**rrr[i])
+            mutate_one = copy.deepcopy(p[r[i]])
+            mutate_one[rr[i]] += (2**rrr[i])
             mutate_ones.append(mutate_one)
-        return np.array（mutate_ones)
-        
+        return np.array(mutate_ones)
 
     def test_valid(self):
         """ 测试当前的valid_patterns是否已经满足要求
@@ -293,7 +297,8 @@ class EvolutionRe:
         :return: 经过选择后的种群矩阵和适应度列表
         """
         p_dict = {self.decode(p[i]): i for i in range(len(p))}
-        p = np.array([p[v] for k, v in p_dict.items()])  # 去除pattern相同而编码不同的重复个体
+        # 去除pattern相同而编码不同的重复个体
+        p = np.array([p[v] for k, v in p_dict.items()])
         es = np.array([es[v] for k, v in p_dict.items()])
         ess = es
         es_sum = []
@@ -320,8 +325,10 @@ class EvolutionRe:
         :param first_n: 取在两类字符串列表中频率差最大的前first_n个词语
         :return: 可用于作为正则表达式元素的词语列表
         """
-        elements_1 = [elements[i] for i in range(len(self.labels)) if self.labels[i]]  # 属于label 1的分词的列表
-        elements_0 = [elements[i] for i in range(len(self.labels)) if self.labels[i] == 0]  # 属于label 0的分词的列表
+        elements_1 = [elements[i] for i in range(
+            len(self.labels)) if self.labels[i]]  # 属于label 1的分词的列表
+        elements_0 = [elements[i] for i in range(
+            len(self.labels)) if self.labels[i] == 0]  # 属于label 0的分词的列表
         ele_1, ele_0 = [], []  # ele_1为label 1中的所有词语，ele_0为label 0中的所有词语
         for x in elements_1:
             ele_1.extend(x)
@@ -336,7 +343,7 @@ class EvolutionRe:
         ele_c = {k: (ele_c1[k] / s_1 - ele_c0.get(k, 0) / s_0) for k in ele_c1}  # 计算频率差
         ele_l = [(k, v) for k, v in ele_c.items()]
         ele = sorted(ele_l, key=lambda a: a[1], reverse=True)
-        ele=[e[0] for e in ele]
+        ele = [e[0] for e in ele]
         return ele[:first_n]  # 取前first_n个
 
     def create_pattern_elements(self, selected_elements, repeat_rate):
@@ -349,10 +356,9 @@ class EvolutionRe:
         # self.pattern_elements.extend(['(?:' + x + ')*' for x in selected_elements])
         # self.pattern_elements.extend(['(?:' + x + ')+' for x in selected_elements])
         self.pattern_elements.extend(['(' + x + ')+' for x in selected_elements])
-        self.pattern_elements.extend([''] * repeat_times * 5)
-        self.pattern_elements.extend(['.*'] * repeat_times)
-        t_size = ((self.dt_max + 1 - self.dt_min) / len(self.pattern_elements))
-        self.code_dict = {c_i: self.pattern_elements[int(c_i / t_size)] for c_i in range(self.dt_min, self.dt_max + 1)}
+        self.pattern_elements.extend([''] * (repeat_times * 5 + 1))
+        self.pattern_elements.extend(['.*'] * (repeat_times + 1))
+        self.pattern_elements_len = len(self.pattern_elements)
 
     def fit(self, strings, elements, labels, stop_words_set):
         """对于给定的strings,elements,labels，获取满足要求的一组正则表达式
@@ -379,7 +385,7 @@ class EvolutionRe:
         best_pattern_strs = set()
         tprs = []
         while True:
-            logging.getLogger('out0').debug('\n\n'+"-"*100)
+            logging.getLogger('out0').debug('\n\n' + "-" * 100)
             logging.getLogger('out0').info("generation: %d" % gen)
             # p = np.array(list(set([tuple(x) for x in list(p)])))
             es = self.evaluate(p)
@@ -395,8 +401,7 @@ class EvolutionRe:
             for e in es_sort:
                 logging.getLogger('out0').debug('%s\t%.2f' % (self.decode(p[e[0]]), e[1]))
             best_pattern_strs.add(best_pattern_str)
-            logging.getLogger('out0').debug("generation: %d\nbest_pattern: %s\nbest_es: %f" %
-                                            (gen, best_pattern_str, best_es_this_gen))
+            logging.getLogger('out0').debug("generation: %d\nbest_pattern: %s\nbest_es: %f" % (gen, best_pattern_str, best_es_this_gen))
             valid_p_cp = copy.deepcopy(self.valid_patterns)
             self.valid_patterns[best_pattern_str] = self.get_match_results(best_pattern_str)
             tpr, fpr = self.test_valid()
@@ -439,7 +444,8 @@ def get_data(data_csv_name, stop_words_file_name, label):
         for row in reader:
             strings.append(row[0])
             elements.append(row[1].split(' '))
-            labels.append(1 if int(row[2]) == label else 0)  # 与给定label相同的label设为1，其他设为0
+            # 与给定label相同的label设为1，其他设为0
+            labels.append(1 if int(row[2]) == label else 0)
     stop_words = set()
     with open(stop_words_file_name, encoding='utf-8')as f:
         for line in f:
@@ -491,10 +497,11 @@ def set_log(t_label):
     return out0, out1
 
 
-def main():
-    target_label = 1
+def main(t_l):
+    target_label = t_l
     set_log(target_label)
-    strings, elements, labels, stop_words_set = get_data('data/data_all.csv', 'data/stop_words.txt', target_label)
+    strings, elements, labels, stop_words_set = get_data(
+        'data/data_all.csv', 'data/stop_words.txt', target_label)
 
     population_num = 200
     dim = int(max([len(st) for st in elements]) / 1)
@@ -503,13 +510,13 @@ def main():
     mutate_rate = 0.1
     div = 1
     dtype = np.uint16
-    logging.getLogger('out0').info('target_label:'+str(target_label))
+    logging.getLogger('out0').info('target_label:' + str(target_label))
     logging.getLogger('out0').info('-------------------------------运行参数如下-------------------------------')
     logging.getLogger('out0').info("population_num:%d\n"
-                                   "dim:%d\n" 
-                                   "max_gen:%d\n" 
-                                   "crossover_rate:%f\n" 
-                                   "mutate_rate:%f\n" 
+                                   "dim:%d\n"
+                                   "max_gen:%d\n"
+                                   "crossover_rate:%f\n"
+                                   "mutate_rate:%f\n"
                                    "div:%.2f\n\n" % (population_num, dim, max_gen, crossover_rate, mutate_rate, div))
     ere = EvolutionRe(population_num, dim, max_gen, crossover_rate, mutate_rate, div, dtype)
     ps, gen, pr = ere.fit(strings, elements, labels, stop_words_set)
@@ -525,4 +532,5 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    t_l_main = int(sys.argv[1])
+    main(t_l_main)

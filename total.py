@@ -36,11 +36,25 @@ def get_pre_label(st, sav_d):
     return max(r, key=r.get)
 
 
+def write_readme(sav_dict, acc):
+    with open('README.md', 'w')as f:
+        f.write('\ntotal accuracy: %.2f\n\n' % acc)
+        for k, v in sav_dict.items():
+            f.write('\n- Label ' + str(k) + ' 的匹配结果\n\n')
+            f.write('```python\n')
+            f.write('total generation: ' + str(v['gen']) + '\n')
+            f.write('valid patterns:\n')
+            for p in v['ps']:
+                f.write('\t' + p + '\n')
+            f.write("tpr: %.2f, fpr: %.2f\n" % (v['pr'][0], v['pr'][1]))
+            f.write('```\n')
+
+
 if __name__ == '__main__':
     sav_path = './savs/'
     sav_dict = {}
     for target_label in [1, 3, 4]:
-        with open(sav_path+'label'+str(target_label)+'_sav.json')as f:
+        with open(sav_path + 'label' + str(target_label) + '_sav.json')as f:
             j = json.load(f)
         sav_dict[target_label] = j
     print(json.dumps(sav_dict, indent=1, ensure_ascii=False))
@@ -51,4 +65,6 @@ if __name__ == '__main__':
     for s in strs:
         pre_labels.append(get_pre_label(s, sav_dict))
     a = [1 for i in range(len(labs)) if pre_labels[i] == labs[i]]
-    print('\n\naccuracy: %.2f' % (sum(a)/len(labs)))
+    acc = sum(a) / len(labs)
+    print('\n\naccuracy: %.2f' % (acc))
+    write_readme(sav_dict, acc)
