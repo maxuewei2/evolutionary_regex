@@ -38,7 +38,8 @@ def get_pre_label(st, sav_d):
 
 def write_readme(sav_dict, acc):
     with open('README.md', 'w')as f:
-        f.write('\ntotal accuracy: %.2f\n\n' % acc)
+        f.write('\nTotal accuracy: %.2f\n\n' % acc)
+        f.write('\n---\n')
         for k, v in sav_dict.items():
             f.write('\n- Label ' + str(k) + ' 的匹配结果\n\n')
             f.write('```python\n')
