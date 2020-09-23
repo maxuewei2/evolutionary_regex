@@ -1,4 +1,6 @@
-# 使用遗传算法生成正则表达式对文本分类
+# RegEx generator using evolutionary algorithm
+
+Using evolutionary algorithms to generate regular expressions to distinguish two sets of text.
 
 Total accuracy: 0.74
 
